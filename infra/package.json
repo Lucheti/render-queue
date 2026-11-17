@@ -1,0 +1,23 @@
+{
+  "name": "render-queue-infra",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "AWS CDK app for render-queue: VPC, ECS Fargate (api behind an ALB, worker), RDS, ElastiCache, S3.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "synth": "cdk synth --quiet",
+    "diff": "cdk diff"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.277.0",
+    "constructs": "^10.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "aws-cdk": "^2.1148.1",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3"
+  }
+}
