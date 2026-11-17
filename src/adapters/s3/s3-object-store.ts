@@ -23,7 +23,7 @@ export interface S3ObjectStoreOptions {
   readonly presignClient: S3Client;
 }
 
-/** ObjectStore backed by S3 or any S3-compatible service such as MinIO. */
+/** ObjectStore backed by S3 or any S3-compatible service such as RustFS or MinIO. */
 export class S3ObjectStore implements ObjectStore {
   public constructor(private readonly options: S3ObjectStoreOptions) {}
 

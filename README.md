@@ -68,15 +68,16 @@ limit, `503` a dependency is down.
 
 ## Run it locally
 
-You need Docker, `curl` and `jq`. The stack is Postgres, Redis, MinIO (S3), the migrations, the API and the worker.
+You need Docker, `curl` and `jq`. The stack is Postgres, Redis, an S3-compatible store
+([RustFS](https://github.com/rustfs/rustfs)), the migrations, the API and the worker.
 
 ```bash
 docker compose up --build
 ```
 
-When `api` reports it is listening, the API is on `http://localhost:3000` (docs at `/docs`) and the MinIO console on
-`http://localhost:9001` (`minioadmin` / `minioadmin`). Host ports can be moved with `POSTGRES_PORT`, `REDIS_PORT`,
-`MINIO_PORT` and `API_PORT` if something else is using them.
+When `api` reports it is listening, the API is on `http://localhost:3000` (docs at `/docs`) and the RustFS console on
+`http://localhost:9001` (`rustfsadmin` / `rustfsadmin`). Host ports can be moved with `POSTGRES_PORT`, `REDIS_PORT`,
+`S3_PORT`, `S3_CONSOLE_PORT` and `API_PORT` if something else is using them; presigned URLs follow `S3_PORT`.
 
 ### A full render with curl
 
@@ -117,7 +118,7 @@ Other job bodies: `{"kind":"thumbnail","params":{"time":2.5}}`, `{"kind":"trim",
 
 ```bash
 cp .env.example .env
-docker compose up -d postgres redis minio minio-init
+docker compose up -d postgres redis s3 s3-init
 pnpm install
 pnpm dev            # applies migrations, then runs the API and the worker with reload
 ```
@@ -130,7 +131,7 @@ pnpm dev            # applies migrations, then runs the API and the worker with 
 | --- | --- |
 | `pnpm gate` | typecheck + lint + unit tests + build; CI runs this |
 | `pnpm test` | unit tests only (no network, no Docker) |
-| `pnpm test:integration` | integration tests; needs Postgres, Redis, MinIO and ffmpeg (see `.env.example` for the variables) |
+| `pnpm test:integration` | integration tests; needs Postgres, Redis, an S3-compatible store and ffmpeg (see `.env.example` for the variables) |
 | `pnpm db:generate` | generate a migration from `src/adapters/drizzle/schema.ts` |
 | `pnpm db:migrate` | apply the committed migrations |
 
@@ -138,10 +139,11 @@ Unit tests cover the domain (value objects, job status transitions, job specs), 
 of the ports, the ffmpeg progress parser and argument builder, the HTTP layer (auth, problem+json, validation, rate
 limiting, OpenAPI, the SSE stream over a real socket), and configuration. Integration tests are tagged and skipped unless
 `INTEGRATION=1`: they exercise the Drizzle repositories on Postgres, the Redis pub/sub bus, BullMQ retry semantics, and
-the whole upload, job, worker and SSE pipeline against MinIO with real ffmpeg output checked through ffprobe.
+the whole upload, job, worker and SSE pipeline against RustFS with real ffmpeg output checked through ffprobe. RustFS
+enforces signatures like S3, so a PUT whose content type differs from the signed one is refused with 403.
 
-CI (`.github/workflows/ci.yml`) has three jobs: `gate`, `infra` (typecheck and `cdk synth`) and `integration` (Postgres
-and Redis service containers, MinIO started from a step because service containers cannot pass a command, ffmpeg from apt).
+CI (`.github/workflows/ci.yml`) has three jobs: `gate`, `infra` (typecheck and `cdk synth`) and `integration` (Postgres,
+Redis and RustFS service containers, ffmpeg from apt).
 
 ## Architecture
 
@@ -285,8 +287,8 @@ tasks; `/health` and `/ready` are exempt.
 | `WORKER_CONCURRENCY`, `WORK_DIR`, `SHUTDOWN_GRACE_MS`, `FFMPEG_PATH`, `FFPROBE_PATH` | worker | 2, `/tmp`, 100000, `ffmpeg`, `ffprobe` |
 
 AWS credentials come from the SDK's default chain: the task role on ECS, `AWS_ACCESS_KEY_ID` and
-`AWS_SECRET_ACCESS_KEY` locally. `S3_PUBLIC_ENDPOINT` exists because inside Docker the API reaches MinIO as
-`http://minio:9000` while the browser needs the URL in the presigned link to be `http://localhost:9000`.
+`AWS_SECRET_ACCESS_KEY` locally. `S3_PUBLIC_ENDPOINT` exists because inside Docker the API reaches the store as
+`http://s3:9000` while the browser needs the URL in the presigned link to be `http://localhost:9000`.
 
 ## Licence
 

@@ -45,7 +45,7 @@ jobs:
       - run: pnpm synth
 
   integration:
-    name: integration (Postgres, Redis, MinIO, ffmpeg)
+    name: integration (Postgres, Redis, S3, ffmpeg)
     runs-on: ubuntu-latest
     env:
       INTEGRATION: "1"
@@ -53,9 +53,22 @@ jobs:
       REDIS_URL: redis://localhost:6379/15
       S3_ENDPOINT: http://localhost:9000
       S3_BUCKET: render-queue-it
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_ACCESS_KEY_ID: rustfsadmin
+      AWS_SECRET_ACCESS_KEY: rustfsadmin
     services:
+      # RustFS: an S3-compatible store that enforces signatures, like real S3.
+      s3:
+        image: rustfs/rustfs:latest
+        env:
+          RUSTFS_ACCESS_KEY: rustfsadmin
+          RUSTFS_SECRET_KEY: rustfsadmin
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -sf http://localhost:9000/health"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
       postgres:
         image: postgres:17-alpine
         env:
@@ -80,19 +93,6 @@ jobs:
           --health-retries 20
     steps:
       - uses: actions/checkout@v4
-      # GitHub service containers cannot pass a command, and MinIO needs `server /data`,
-      # so this one container is started by a step instead of under `services:`.
-      - name: Start MinIO
-        run: |
-          docker run -d --name minio -p 9000:9000 \
-            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
-            minio/minio:latest server /data
-          for i in $(seq 1 30); do
-            curl -sf http://localhost:9000/minio/health/ready && exit 0
-            sleep 1
-          done
-          docker logs minio
-          exit 1
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - uses: pnpm/action-setup@v4
